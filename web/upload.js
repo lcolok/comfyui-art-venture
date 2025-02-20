@@ -17,6 +17,24 @@ const URL_REGEX = /^((blob:)?https?:\/\/|\/view\?|\/api\/view\?|data:image\/)/
 
 const supportedNodes = ['LoadImageFromUrl', 'LoadImageAsMaskFromUrl', 'LoadVideoFromUrl'];
 
+function safeDefineProperty(obj, prop, descriptor) {
+  try {
+    const existingDesc = Object.getOwnPropertyDescriptor(obj, prop);
+    if (existingDesc && !existingDesc.configurable) {
+      console.warn(`Property ${prop} is not configurable. Attempting fallback assignment.`);
+      if (descriptor.set) {
+        obj[prop] = descriptor.get ? descriptor.get() : obj[prop];
+      }
+      return false;
+    }
+    Object.defineProperty(obj, prop, descriptor);
+    return true;
+  } catch (error) {
+    console.warn(`Error defining property ${prop}:`, error);
+    return false;
+  }
+}
+
 function injectHidden(widget) {
   widget.computeSize = (target_width) => {
     if (widget.hidden) {
@@ -25,7 +43,7 @@ function injectHidden(widget) {
     return [target_width, 20];
   };
   widget._type = widget.type;
-  Object.defineProperty(widget, 'type', {
+  safeDefineProperty(widget, 'type', {
     set: function (value) {
       widget._type = value;
     },
@@ -150,7 +168,7 @@ function addVideoCustomSize(nodeType, nodeData, widgetName) {
     injectHidden(heightWidget);
     heightWidget.options.serialize = false;
     sizeOptionWidget._value = sizeOptionWidget.value;
-    Object.defineProperty(sizeOptionWidget, 'value', {
+    safeDefineProperty(sizeOptionWidget, 'value', {
       set: function (value) {
         //TODO: Only modify hidden/reset size when a change occurs
         if (value == 'Custom Width') {
@@ -345,7 +363,7 @@ function patchValueSetter(nodeType, widgetName) {
       delete app.nodeOutputs[this.id]
     };
 
-    Object.defineProperty(pathWidget, 'value', {
+    safeDefineProperty(pathWidget, 'value', {
       set: setter,
       get: () => pathWidget._value,
     });
